@@ -1,5 +1,6 @@
 using BackgroundJobs.Api.Data;
 using BackgroundJobs.Api.BackgroundTasks;
+using BackgroundJobs.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,6 +18,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 });
 builder.Services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
 builder.Services.AddHostedService<QueuedHostedService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+
 var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
