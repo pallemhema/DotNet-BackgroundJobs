@@ -1,17 +1,20 @@
-using BackgroundJobs.Api.BackgroundTasks;
+using BackgroundJobs.Api.Services;
 
 namespace BackgroundJobs.Api.BackgroundTasks;
 
 public class QueuedHostedService : BackgroundService
 {
     private readonly IBackgroundTaskQueue _taskQueue;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<QueuedHostedService> _logger;
 
     public QueuedHostedService(
         IBackgroundTaskQueue taskQueue,
+        IServiceScopeFactory scopeFactory,
         ILogger<QueuedHostedService> logger)
     {
         _taskQueue = taskQueue;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -20,34 +23,29 @@ public class QueuedHostedService : BackgroundService
     {
         _logger.LogInformation("Queued Hosted Service started.");
 
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                // Wait for the next available job
                 var job = await _taskQueue.DequeueAsync(stoppingToken);
+
+                await using var scope = _scopeFactory.CreateAsyncScope();
+
+                var emailService = scope.ServiceProvider
+                    .GetRequiredService<IEmailService>();
 
                 _logger.LogInformation(
                     "Processing welcome email for {Email}",
                     job.Email);
 
-                // Simulate email processing
-                // await Task.Delay(3000, stoppingToken);
-                await Task.Delay(10000, stoppingToken);
-
-                _logger.LogInformation(
-                    "Welcome email processed for {Email}",
-                    job.Email);
+                await emailService.SendWelcomeEmailAsync(
+                    job, stoppingToken);
             }
-            catch (OperationCanceledException)
-                when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error processing background job.");
-            }
+        }
+        catch (OperationCanceledException)
+            when (stoppingToken.IsCancellationRequested)
+        {
+            // Normal application shutdown.
         }
 
         _logger.LogInformation("Queued Hosted Service stopped.");
